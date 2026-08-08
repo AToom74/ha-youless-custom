@@ -1,3 +1,5 @@
+<img src="brands/youless_custom/icon@2x.png" alt="YouLess (custom) icon" width="96" height="96">
+
 # YouLess (custom) — Home Assistant integration
 
 A custom Home Assistant integration for the YouLess energy monitor (LS110 / LS120),
