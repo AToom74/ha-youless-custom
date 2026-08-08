@@ -1,4 +1,4 @@
-<img src="brands/youless_custom/icon@2x.png" alt="YouLess (custom) icon" width="96" height="96">
+<img src="custom_components/youless_custom/brand/icon@2x.png" alt="YouLess (custom) icon" width="96" height="96">
 
 # YouLess (custom) — Home Assistant integration
 
