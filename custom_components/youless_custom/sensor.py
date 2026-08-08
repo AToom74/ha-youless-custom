@@ -41,15 +41,28 @@ def _nested(api: YoulessAPI, obj: str, attr: str) -> Any:
     return getattr(parent, attr, None) if parent is not None else None
 
 
-# Mirrors the device grouping of the built-in `youless` integration, so a
-# YouLess device shows up the same way in the device list: one virtual
-# device per meter type instead of a single device holding every sensor.
+def _has_value(sensor: Any) -> bool:
+    """True only when the meter exists AND currently reports a value.
+
+    The youless_api library instantiates the water_meter / extra_meter
+    objects even when those inputs are disabled on the device; only their
+    ``.value`` stays None. Filtering on the object alone (``is not None``)
+    would therefore register permanently-``unknown`` entities, so we filter
+    on the value instead. A meter that is switched off now will appear after
+    a reload once it is enabled again.
+    """
+    return sensor is not None and getattr(sensor, "value", None) is not None
+
+
+# English display names, matching the built-in `youless` integration's
+# translated device strings, but hardcoded so they stay in English regardless
+# of the Home Assistant UI language.
 DEVICE_GROUP_NAMES: dict[str, str] = {
-    "power": "Power",
-    "delivery": "Delivery",
-    "gas": "Gas",
-    "water": "Water",
-    "extra": "Extra",
+    "power": "Power meter",
+    "delivery": "Energy delivery meter",
+    "gas": "Gas meter",
+    "water": "Water meter",
+    "extra": "S0 meter",
 }
 
 
@@ -61,10 +74,12 @@ class YoulessSensorDescription(SensorEntityDescription):
     device_group: str
 
 
+# key / name pairs match the built-in integration one-to-one. `name` holds the
+# English text that the built-in integration produces via its translation keys.
 SENSORS: list[YoulessSensorDescription] = [
     YoulessSensorDescription(
-        key="power_usage",
-        name="Usage",
+        key="usage",
+        name="Current power usage",
         device_group="power",
         get_sensor=lambda api: _get(api, "current_power_usage"),
         device_class=SensorDeviceClass.POWER,
@@ -73,7 +88,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_total",
-        name="Total",
+        name="Total energy import",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "total"),
         device_class=SensorDeviceClass.ENERGY,
@@ -82,7 +97,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_high",
-        name="High tariff",
+        name="Energy import tariff 2",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "high"),
         device_class=SensorDeviceClass.ENERGY,
@@ -91,7 +106,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_low",
-        name="Low tariff",
+        name="Energy import tariff 1",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "low"),
         device_class=SensorDeviceClass.ENERGY,
@@ -100,7 +115,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="delivery_high",
-        name="High tariff",
+        name="Energy export tariff 2",
         device_group="delivery",
         get_sensor=lambda api: _nested(api, "delivery_meter", "high"),
         device_class=SensorDeviceClass.ENERGY,
@@ -109,7 +124,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="delivery_low",
-        name="Low tariff",
+        name="Energy export tariff 1",
         device_group="delivery",
         get_sensor=lambda api: _nested(api, "delivery_meter", "low"),
         device_class=SensorDeviceClass.ENERGY,
@@ -118,7 +133,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="gas",
-        name=None,
+        name="Total gas usage",
         device_group="gas",
         get_sensor=lambda api: _get(api, "gas_meter"),
         device_class=SensorDeviceClass.GAS,
@@ -127,7 +142,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="water",
-        name=None,
+        name="Total water usage",
         device_group="water",
         get_sensor=lambda api: _get(api, "water_meter"),
         device_class=SensorDeviceClass.WATER,
@@ -136,7 +151,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="extra_total",
-        name="Total",
+        name="Total energy",
         device_group="extra",
         get_sensor=lambda api: _nested(api, "extra_meter", "total"),
         device_class=SensorDeviceClass.ENERGY,
@@ -145,7 +160,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="extra_usage",
-        name="Usage",
+        name="Current usage",
         device_group="extra",
         get_sensor=lambda api: _nested(api, "extra_meter", "usage"),
         device_class=SensorDeviceClass.POWER,
@@ -154,14 +169,15 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
 ]
 
-# Per-phase sensors: only created on devices/firmware that expose phase data.
-# Grouped under "power", same as the built-in integration.
+# Per-phase sensors. Keys use the official `phase_<n>_...` form (WITH the
+# underscore) so unique_ids and entity_ids line up with the built-in
+# integration. Only created on devices/firmware that expose phase data.
 for _p in (1, 2, 3):
     SENSORS.extend(
         [
             YoulessSensorDescription(
-                key=f"phase{_p}_power",
-                name=f"Phase {_p} power",
+                key=f"phase_{_p}_power",
+                name=f"Power phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "power"),
                 device_class=SensorDeviceClass.POWER,
@@ -169,8 +185,8 @@ for _p in (1, 2, 3):
                 state_class=SensorStateClass.MEASUREMENT,
             ),
             YoulessSensorDescription(
-                key=f"phase{_p}_voltage",
-                name=f"Phase {_p} voltage",
+                key=f"phase_{_p}_voltage",
+                name=f"Voltage phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "voltage"),
                 device_class=SensorDeviceClass.VOLTAGE,
@@ -178,8 +194,8 @@ for _p in (1, 2, 3):
                 state_class=SensorStateClass.MEASUREMENT,
             ),
             YoulessSensorDescription(
-                key=f"phase{_p}_current",
-                name=f"Phase {_p} current",
+                key=f"phase_{_p}_current",
+                name=f"Current phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "current"),
                 device_class=SensorDeviceClass.CURRENT,
@@ -202,7 +218,7 @@ async def async_setup_entry(
     async_add_entities(
         YoulessSensor(coordinator, description)
         for description in SENSORS
-        if description.get_sensor(api) is not None
+        if _has_value(description.get_sensor(api))
     )
 
 
@@ -226,14 +242,18 @@ class YoulessSensor(CoordinatorEntity[YoulessCoordinator], SensorEntity):
             getattr(device, "mac_address", None)
             or coordinator.config_entry.entry_id
         )
-        self._attr_unique_id = f"{base_identifier}_{description.key}"
+        # Mirrors the built-in integration's `f"{DOMAIN}_{device}_{key}"`,
+        # where its `device` is the MAC address it stores under CONF_DEVICE.
+        # This only lines up with the built-in's registry entries when this
+        # custom component's DOMAIN is also "youless" (see const.py).
+        self._attr_unique_id = f"{DOMAIN}_{base_identifier}_{description.key}"
 
-        # One virtual device per meter type (power/delivery/gas/water/extra),
-        # mirroring the built-in `youless` integration's device layout,
-        # instead of a single device holding every sensor.
+        # One virtual device per meter type, using the SAME identifier form as
+        # the built-in integration: (DOMAIN, "power"), (DOMAIN, "gas"), ...
+        # (Assumes a single YouLess device, exactly like the built-in.)
         group = description.device_group
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{base_identifier}_{group}")},
+            identifiers={(DOMAIN, group)},
             name=DEVICE_GROUP_NAMES.get(group, group.title()),
             manufacturer="YouLess",
             model=getattr(device, "model", None),
