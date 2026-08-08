@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "YouLess (custom)",
+        "description": "Enter the connection details for your YouLess device. Leave username and password empty if no password is set on the device.",
+        "data": {
+          "host": "Host or IP address",
+          "name": "Name",
+          "username": "Username",
+          "password": "Password",
+          "scan_interval": "Poll interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the IP address and, if a password is set on the device, the password."
+    },
+    "abort": {
+      "already_configured": "This YouLess device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "YouLess options",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
+        }
+      }
+    }
+  }
+}

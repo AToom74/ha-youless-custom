@@ -1,0 +1,12 @@
+{
+  "domain": "youless_custom",
+  "name": "YouLess (custom)",
+  "codeowners": ["@AToom74"],
+  "config_flow": true,
+  "documentation": "https://github.com/AToom74/ha-youless-custom",
+  "issue_tracker": "https://github.com/AToom74/ha-youless-custom/issues",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["youless-api==2.2.0"],
+  "version": "1.0.0"
+}
