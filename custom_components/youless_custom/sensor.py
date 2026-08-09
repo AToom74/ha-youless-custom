@@ -41,15 +41,28 @@ def _nested(api: YoulessAPI, obj: str, attr: str) -> Any:
     return getattr(parent, attr, None) if parent is not None else None
 
 
-# Mirrors the device grouping of the built-in `youless` integration, so a
-# YouLess device shows up the same way in the device list: one virtual
-# device per meter type instead of a single device holding every sensor.
+def _has_value(sensor: Any) -> bool:
+    """True only when the meter exists AND currently reports a value.
+
+    The youless_api library instantiates the water_meter / extra_meter
+    objects even when those inputs are disabled on the device; only their
+    ``.value`` stays None. Filtering on the object alone (``is not None``)
+    would therefore register permanently-``unknown`` entities, so we filter
+    on the value instead. A meter that is switched off now will appear after
+    a reload once it is enabled again.
+    """
+    return sensor is not None and getattr(sensor, "value", None) is not None
+
+
+# English display names, matching the built-in `youless` integration's
+# translated device strings, but hardcoded so they stay in English regardless
+# of the Home Assistant UI language.
 DEVICE_GROUP_NAMES: dict[str, str] = {
-    "power": "Power",
-    "delivery": "Delivery",
-    "gas": "Gas",
-    "water": "Water",
-    "extra": "Extra",
+    "power": "Power meter",
+    "delivery": "Energy delivery meter",
+    "gas": "Gas meter",
+    "water": "Water meter",
+    "extra": "S0 meter",
 }
 
 
@@ -64,7 +77,7 @@ class YoulessSensorDescription(SensorEntityDescription):
 SENSORS: list[YoulessSensorDescription] = [
     YoulessSensorDescription(
         key="power_usage",
-        name="Usage",
+        name="Current power usage",
         device_group="power",
         get_sensor=lambda api: _get(api, "current_power_usage"),
         device_class=SensorDeviceClass.POWER,
@@ -73,7 +86,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_total",
-        name="Total",
+        name="Total energy import",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "total"),
         device_class=SensorDeviceClass.ENERGY,
@@ -82,7 +95,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_high",
-        name="High tariff",
+        name="Energy import tariff 2",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "high"),
         device_class=SensorDeviceClass.ENERGY,
@@ -91,7 +104,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="power_low",
-        name="Low tariff",
+        name="Energy import tariff 1",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "low"),
         device_class=SensorDeviceClass.ENERGY,
@@ -100,7 +113,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="delivery_high",
-        name="High tariff",
+        name="Energy export tariff 2",
         device_group="delivery",
         get_sensor=lambda api: _nested(api, "delivery_meter", "high"),
         device_class=SensorDeviceClass.ENERGY,
@@ -109,7 +122,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="delivery_low",
-        name="Low tariff",
+        name="Energy export tariff 1",
         device_group="delivery",
         get_sensor=lambda api: _nested(api, "delivery_meter", "low"),
         device_class=SensorDeviceClass.ENERGY,
@@ -118,7 +131,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="gas",
-        name=None,
+        name="Total gas usage",
         device_group="gas",
         get_sensor=lambda api: _get(api, "gas_meter"),
         device_class=SensorDeviceClass.GAS,
@@ -127,7 +140,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="water",
-        name=None,
+        name="Total water usage",
         device_group="water",
         get_sensor=lambda api: _get(api, "water_meter"),
         device_class=SensorDeviceClass.WATER,
@@ -136,7 +149,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="extra_total",
-        name="Total",
+        name="Total energy",
         device_group="extra",
         get_sensor=lambda api: _nested(api, "extra_meter", "total"),
         device_class=SensorDeviceClass.ENERGY,
@@ -145,7 +158,7 @@ SENSORS: list[YoulessSensorDescription] = [
     ),
     YoulessSensorDescription(
         key="extra_usage",
-        name="Usage",
+        name="Current usage",
         device_group="extra",
         get_sensor=lambda api: _nested(api, "extra_meter", "usage"),
         device_class=SensorDeviceClass.POWER,
@@ -161,7 +174,7 @@ for _p in (1, 2, 3):
         [
             YoulessSensorDescription(
                 key=f"phase{_p}_power",
-                name=f"Phase {_p} power",
+                name=f"Power phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "power"),
                 device_class=SensorDeviceClass.POWER,
@@ -170,7 +183,7 @@ for _p in (1, 2, 3):
             ),
             YoulessSensorDescription(
                 key=f"phase{_p}_voltage",
-                name=f"Phase {_p} voltage",
+                name=f"Voltage phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "voltage"),
                 device_class=SensorDeviceClass.VOLTAGE,
@@ -179,7 +192,7 @@ for _p in (1, 2, 3):
             ),
             YoulessSensorDescription(
                 key=f"phase{_p}_current",
-                name=f"Phase {_p} current",
+                name=f"Current phase {_p}",
                 device_group="power",
                 get_sensor=lambda api, o=f"phase{_p}": _nested(api, o, "current"),
                 device_class=SensorDeviceClass.CURRENT,
@@ -202,7 +215,7 @@ async def async_setup_entry(
     async_add_entities(
         YoulessSensor(coordinator, description)
         for description in SENSORS
-        if description.get_sensor(api) is not None
+        if _has_value(description.get_sensor(api))
     )
 
 
@@ -230,7 +243,9 @@ class YoulessSensor(CoordinatorEntity[YoulessCoordinator], SensorEntity):
 
         # One virtual device per meter type (power/delivery/gas/water/extra),
         # mirroring the built-in `youless` integration's device layout,
-        # instead of a single device holding every sensor.
+        # instead of a single device holding every sensor. Keyed by our own
+        # base_identifier (MAC/entry_id) so this stays correct even if a user
+        # ever has more than one YouLess device configured.
         group = description.device_group
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{base_identifier}_{group}")},
