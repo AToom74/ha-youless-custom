@@ -8,5 +8,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/AToom74/ha-youless-custom/issues",
   "requirements": ["youless-api==2.2.0"],
-  "version": "1.1.0"
+  "version": "1.2.0"
 }
