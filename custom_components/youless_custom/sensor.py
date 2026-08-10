@@ -85,13 +85,20 @@ SENSORS: list[YoulessSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
     ),
     YoulessSensorDescription(
+        # The youless_api library fills power_meter.total from the device's
+        # "net" field (p1 + p2 - n1 - n2): total import MINUS total export,
+        # not a monotonic counter. On days with a lot of solar export it can
+        # go down, so unlike the other meters here this can't be
+        # TOTAL_INCREASING - HA logs a "state is not strictly increasing"
+        # warning/repair issue otherwise. The built-in `youless` integration
+        # has the same field and also uses plain TOTAL for it.
         key="power_total",
-        name="Total energy import",
+        name="Total energy (net)",
         device_group="power",
         get_sensor=lambda api: _nested(api, "power_meter", "total"),
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        state_class=SensorStateClass.TOTAL,
     ),
     YoulessSensorDescription(
         key="power_high",
